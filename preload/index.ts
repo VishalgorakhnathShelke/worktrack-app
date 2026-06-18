@@ -4,5 +4,6 @@ import { contextBridge, ipcRenderer } from 'electron'
 // The renderer can call window.api.getAppVersion() but cannot access
 // Node/Electron APIs directly.
 contextBridge.exposeInMainWorld('api', {
-  getAppVersion: () => ipcRenderer.invoke('get-app-version')
+  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+  getSurajLol: async() => "kuch na"
 })
