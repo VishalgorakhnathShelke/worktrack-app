@@ -44,7 +44,9 @@ def is_sensitive_event(event: SessionEvent) -> bool:
     candidates: Iterable[str] = (
         event.safe_selector or "",
         event.element_text or "",
-        str(event.page_url),
+        event.target_label or "",
+        event.window_title or "",
+        str(event.page_url) if event.page_url else "",
     )
     return any(SENSITIVE_PATTERN.search(candidate) for candidate in candidates)
 
@@ -53,10 +55,12 @@ def sanitize_event(
     event: SessionEvent, typed_text_consent: bool, allowed_domains: list[str] | None = None
 ) -> SessionEvent:
     reasons = list(event.redaction_reasons)
-    hostname = urlsplit(str(event.page_url)).hostname or ""
-    if allowed_domains and hostname not in allowed_domains:
-        raise ValueError(f"Domain '{hostname}' is not allowed for recording")
-    update: dict[str, object] = {"page_url": HttpUrl(safe_url(str(event.page_url)))}
+    update: dict[str, object] = {}
+    if event.page_url:
+        hostname = urlsplit(str(event.page_url)).hostname or ""
+        if allowed_domains and hostname not in allowed_domains:
+            raise ValueError(f"Domain '{hostname}' is not allowed for recording")
+        update["page_url"] = HttpUrl(safe_url(str(event.page_url)))
 
     sensitive = is_sensitive_event(event)
     if not typed_text_consent:
@@ -74,13 +78,20 @@ def sanitize_event(
     if sensitive:
         update["safe_selector"] = None
         update["element_text"] = "[REDACTED_SENSITIVE_FIELD]"
+        update["target_label"] = "[REDACTED_SENSITIVE_FIELD]"
     else:
         safe_selector, selector_reasons = redact_text(event.safe_selector)
         element_text, element_reasons = redact_text(event.element_text)
+        target_label, target_reasons = redact_text(event.target_label)
+        window_title, window_reasons = redact_text(event.window_title)
         update["safe_selector"] = safe_selector
         update["element_text"] = element_text
+        update["target_label"] = target_label
+        update["window_title"] = window_title
         reasons.extend(selector_reasons)
         reasons.extend(element_reasons)
+        reasons.extend(target_reasons)
+        reasons.extend(window_reasons)
 
     update["redaction_reasons"] = sorted(set(reasons))
     return event.model_copy(update=update)
@@ -102,10 +113,11 @@ def build_external_ai_preview(session: WorkflowSession, provider: str) -> Extern
         sensitive = is_sensitive_event(event)
         consented_text, _ = redact_text(event.consented_text)
         element_text, _ = redact_text(event.element_text)
+        target_label, _ = redact_text(event.target_label)
         approved_events.append(
             {
                 "event_type": event.event_type,
-                "element_text": None if sensitive else element_text,
+                "element_text": None if sensitive else element_text or target_label,
                 "consented_text": None if sensitive else consented_text,
                 "duration_ms": event.duration_ms,
             }

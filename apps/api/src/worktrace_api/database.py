@@ -1,7 +1,17 @@
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, DateTime, Integer, String, create_engine
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    UniqueConstraint,
+    create_engine,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 from worktrace_api.settings import get_settings
@@ -19,6 +29,10 @@ class WorkflowSessionRecord(TenantRecord, Base):
     __tablename__ = "workflow_sessions"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    recording_id: Mapped[str | None] = mapped_column(
+        ForeignKey("recordings.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    source_type: Mapped[str] = mapped_column(String(20), index=True)
     workflow_name: Mapped[str] = mapped_column(String(200), index=True)
     status: Mapped[str] = mapped_column(String(30), index=True)
     typed_text_consent: Mapped[bool] = mapped_column(Boolean)
@@ -39,9 +53,16 @@ class WorkflowSessionRecord(TenantRecord, Base):
 
 class SOPRecord(TenantRecord, Base):
     __tablename__ = "sops"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id", "source_session_id", "version", name="uq_sop_tenant_session_version"
+        ),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
-    source_session_id: Mapped[str] = mapped_column(String(36), index=True)
+    source_session_id: Mapped[str] = mapped_column(
+        ForeignKey("workflow_sessions.id", ondelete="CASCADE"), index=True
+    )
     version: Mapped[int] = mapped_column(Integer)
     status: Mapped[str] = mapped_column(String(30), index=True)
     title: Mapped[str] = mapped_column(String(200))
@@ -55,7 +76,9 @@ class FeedbackRecord(TenantRecord, Base):
     __tablename__ = "feedback"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
-    session_id: Mapped[str] = mapped_column(String(36), index=True)
+    session_id: Mapped[str] = mapped_column(
+        ForeignKey("workflow_sessions.id", ondelete="CASCADE"), index=True
+    )
     sop_step_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     transcript: Mapped[str] = mapped_column(String(4000))
     classification: Mapped[str] = mapped_column(String(40), index=True)
@@ -69,7 +92,9 @@ class AIApprovalRecord(TenantRecord, Base):
     __tablename__ = "ai_approvals"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
-    session_id: Mapped[str] = mapped_column(String(36), index=True)
+    session_id: Mapped[str] = mapped_column(
+        ForeignKey("workflow_sessions.id", ondelete="CASCADE"), index=True
+    )
     actor: Mapped[str] = mapped_column(String(200))
     payload_hash: Mapped[str] = mapped_column(String(64))
     approved: Mapped[bool] = mapped_column(Boolean)
@@ -82,6 +107,8 @@ class RecordingRecord(TenantRecord, Base):
     __tablename__ = "recordings"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    session_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    source_type: Mapped[str] = mapped_column(String(20), index=True)
     workflow_name: Mapped[str] = mapped_column(String(200), index=True)
     status: Mapped[str] = mapped_column(String(50), index=True)
     expected_chunk_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -98,7 +125,9 @@ class RecordingRecord(TenantRecord, Base):
 class RecordingChunkRecord(TenantRecord, Base):
     __tablename__ = "recording_chunks"
 
-    recording_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    recording_id: Mapped[str] = mapped_column(
+        ForeignKey("recordings.id", ondelete="CASCADE"), primary_key=True
+    )
     chunk_index: Mapped[int] = mapped_column(Integer, primary_key=True)
     content_type: Mapped[str] = mapped_column(String(30), index=True)
     media_type: Mapped[str] = mapped_column(String(100))
@@ -108,6 +137,34 @@ class RecordingChunkRecord(TenantRecord, Base):
     idempotency_key: Mapped[str] = mapped_column(String(200))
     payload_size: Mapped[int] = mapped_column(Integer)
     storage_key: Mapped[str] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+    )
+
+
+class ScreenshotRecord(TenantRecord, Base):
+    __tablename__ = "screenshots"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "recording_id", "sequence", name="uq_screenshot_sequence"),
+        UniqueConstraint("tenant_id", "recording_id", "content_hash", name="uq_screenshot_hash"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    recording_id: Mapped[str] = mapped_column(
+        ForeignKey("recordings.id", ondelete="CASCADE"), index=True
+    )
+    session_id: Mapped[str | None] = mapped_column(
+        ForeignKey("workflow_sessions.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    sequence: Mapped[int] = mapped_column(Integer)
+    captured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    storage_key: Mapped[str] = mapped_column(String(500))
+    media_type: Mapped[str] = mapped_column(String(100), default="image/png")
+    width: Mapped[int] = mapped_column(Integer)
+    height: Mapped[int] = mapped_column(Integer)
+    change_score: Mapped[float] = mapped_column(Float)
+    content_hash: Mapped[str] = mapped_column(String(64), index=True)
+    redaction_status: Mapped[str] = mapped_column(String(30), default="pending", index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )

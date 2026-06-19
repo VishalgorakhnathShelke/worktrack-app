@@ -137,7 +137,7 @@ def health() -> dict[str, str]:
     tags=["recordings"],
 )
 def create_recording(payload: RecordingCreate, repo: Repository = Depends(repository)) -> Recording:
-    return repo.create_recording(payload.workflow_name, payload.has_audio)
+    return repo.create_recording(payload.workflow_name, payload.source_type, payload.has_audio)
 
 
 @app.put(

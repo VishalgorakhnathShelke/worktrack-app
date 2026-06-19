@@ -10,6 +10,7 @@ def create_recording(client, has_audio=True):
         json={"workflow_name": "Approve invoice", "has_audio": has_audio},
     )
     assert response.status_code == 201
+    assert response.json()["source_type"] == "desktop"
     return response.json()
 
 

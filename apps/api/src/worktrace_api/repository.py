@@ -16,6 +16,7 @@ from worktrace_api.database import (
 )
 from worktrace_api.schemas import (
     SOP,
+    CaptureSource,
     ChunkContentType,
     ChunkReceipt,
     Feedback,
@@ -47,6 +48,8 @@ class Repository:
         record = WorkflowSessionRecord(
             id=str(session.id),
             tenant_id=str(session.tenant_id),
+            recording_id=str(session.recording_id) if session.recording_id else None,
+            source_type=session.source_type,
             workflow_name=session.workflow_name,
             status=session.status,
             typed_text_consent=session.typed_text_consent,
@@ -64,11 +67,14 @@ class Repository:
         self.db.commit()
         return session
 
-    def create_recording(self, workflow_name: str, has_audio: bool) -> Recording:
+    def create_recording(
+        self, workflow_name: str, source_type: CaptureSource, has_audio: bool
+    ) -> Recording:
         recording = Recording(
             tenant_id=self.tenant_id,
             id=uuid4(),
             workflow_name=workflow_name,
+            source_type=source_type,
             status=RecordingStatus.RECORDING,
             uploaded_chunk_count=0,
             uploaded_bytes=0,
@@ -79,6 +85,7 @@ class Repository:
             RecordingRecord(
                 id=str(recording.id),
                 tenant_id=str(self.tenant_id),
+                source_type=source_type,
                 workflow_name=workflow_name,
                 status=recording.status,
                 uploaded_chunk_count=0,
@@ -425,6 +432,8 @@ class Repository:
                 "schema_version": "1.0",
                 "tenant_id": record.tenant_id,
                 "id": record.id,
+                "recording_id": record.recording_id,
+                "source_type": record.source_type,
                 "workflow_name": record.workflow_name,
                 "status": record.status,
                 "typed_text_consent": record.typed_text_consent,
@@ -480,6 +489,8 @@ class Repository:
                 "tenant_id": record.tenant_id,
                 "id": record.id,
                 "workflow_name": record.workflow_name,
+                "source_type": record.source_type,
+                "session_id": record.session_id,
                 "status": record.status,
                 "expected_chunk_count": record.expected_chunk_count,
                 "uploaded_chunk_count": record.uploaded_chunk_count,

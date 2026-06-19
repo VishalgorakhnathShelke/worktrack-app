@@ -1356,6 +1356,14 @@
         ],
         "title": "Body_upload_recording_chunk_recordings__recording_id__chunks__chunk_index__put"
       },
+      "CaptureSource": {
+        "type": "string",
+        "enum": [
+          "browser",
+          "desktop"
+        ],
+        "title": "CaptureSource"
+      },
       "ChunkContentType": {
         "type": "string",
         "enum": [
@@ -1408,7 +1416,10 @@
         "enum": [
           "click",
           "input",
+          "key_burst",
+          "scroll",
           "navigation",
+          "app_switch",
           "pause",
           "resume"
         ],
@@ -1683,6 +1694,21 @@
             "type": "string",
             "title": "Workflow Name"
           },
+          "source_type": {
+            "$ref": "#/components/schemas/CaptureSource"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
           "status": {
             "$ref": "#/components/schemas/RecordingStatus"
           },
@@ -1747,6 +1773,7 @@
           "tenant_id",
           "id",
           "workflow_name",
+          "source_type",
           "status",
           "uploaded_chunk_count",
           "uploaded_bytes",
@@ -1777,6 +1804,10 @@
             "maxLength": 200,
             "minLength": 1,
             "title": "Workflow Name"
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/CaptureSource",
+            "default": "desktop"
           },
           "has_audio": {
             "type": "boolean",
@@ -2012,6 +2043,18 @@
             "format": "uuid",
             "title": "Id"
           },
+          "sequence": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sequence"
+          },
           "timestamp": {
             "type": "string",
             "format": "date-time",
@@ -2021,11 +2064,106 @@
             "$ref": "#/components/schemas/EventType"
           },
           "page_url": {
-            "type": "string",
-            "maxLength": 2083,
-            "minLength": 1,
-            "format": "uri",
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2083,
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Page Url"
+          },
+          "application": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Application"
+          },
+          "window_title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window Title"
+          },
+          "x": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "X"
+          },
+          "y": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Y"
+          },
+          "modifiers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "title": "Modifiers"
+          },
+          "target_role": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Role"
+          },
+          "target_label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Label"
+          },
+          "target_bounds": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TargetBounds"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "safe_selector": {
             "anyOf": [
@@ -2075,6 +2213,30 @@
             ],
             "title": "Screenshot Reference"
           },
+          "before_screenshot_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before Screenshot Id"
+          },
+          "after_screenshot_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After Screenshot Id"
+          },
           "duration_ms": {
             "anyOf": [
               {
@@ -2086,6 +2248,11 @@
               }
             ],
             "title": "Duration Ms"
+          },
+          "event_data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Event Data"
           },
           "redaction_reasons": {
             "items": {
@@ -2099,8 +2266,7 @@
         "type": "object",
         "required": [
           "tenant_id",
-          "event_type",
-          "page_url"
+          "event_type"
         ],
         "title": "SessionEvent"
       },
@@ -2112,6 +2278,37 @@
           "approved"
         ],
         "title": "SessionStatus"
+      },
+      "TargetBounds": {
+        "properties": {
+          "x": {
+            "type": "number",
+            "title": "X"
+          },
+          "y": {
+            "type": "number",
+            "title": "Y"
+          },
+          "width": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Width"
+          },
+          "height": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Height"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "x",
+          "y",
+          "width",
+          "height"
+        ],
+        "title": "TargetBounds"
       },
       "ValidationError": {
         "properties": {
@@ -2165,6 +2362,22 @@
             "type": "string",
             "format": "uuid",
             "title": "Tenant Id"
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/CaptureSource",
+            "default": "browser"
+          },
+          "recording_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recording Id"
           },
           "workflow_name": {
             "type": "string",
@@ -2293,6 +2506,22 @@
             "type": "string",
             "format": "uuid",
             "title": "Tenant Id"
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/CaptureSource",
+            "default": "browser"
+          },
+          "recording_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recording Id"
           },
           "workflow_name": {
             "type": "string",

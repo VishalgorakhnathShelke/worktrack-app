@@ -15,24 +15,59 @@ class StrictModel(BaseModel):
 class EventType(StrEnum):
     CLICK = "click"
     INPUT = "input"
+    KEY_BURST = "key_burst"
+    SCROLL = "scroll"
     NAVIGATION = "navigation"
+    APP_SWITCH = "app_switch"
     PAUSE = "pause"
     RESUME = "resume"
+
+
+class CaptureSource(StrEnum):
+    BROWSER = "browser"
+    DESKTOP = "desktop"
+
+
+class TargetBounds(StrictModel):
+    x: float
+    y: float
+    width: float = Field(ge=0)
+    height: float = Field(ge=0)
 
 
 class SessionEvent(StrictModel):
     schema_version: Literal["1.0"] = SCHEMA_VERSION
     tenant_id: UUID
     id: UUID = Field(default_factory=uuid4)
+    sequence: int | None = Field(default=None, ge=0)
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     event_type: EventType
-    page_url: HttpUrl
+    page_url: HttpUrl | None = None
+    application: str | None = Field(default=None, max_length=200)
+    window_title: str | None = Field(default=None, max_length=500)
+    x: float | None = None
+    y: float | None = None
+    modifiers: list[str] = Field(default_factory=list, max_length=8)
+    target_role: str | None = Field(default=None, max_length=100)
+    target_label: str | None = Field(default=None, max_length=500)
+    target_bounds: TargetBounds | None = None
     safe_selector: str | None = Field(default=None, max_length=500)
     element_text: str | None = Field(default=None, max_length=500)
     consented_text: str | None = Field(default=None, max_length=2000)
     screenshot_reference: UUID | None = None
+    before_screenshot_id: UUID | None = None
+    after_screenshot_id: UUID | None = None
     duration_ms: int | None = Field(default=None, ge=0)
+    event_data: dict[str, Any] = Field(default_factory=dict)
     redaction_reasons: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def requires_event_context(self) -> "SessionEvent":
+        if self.event_type == EventType.NAVIGATION and not self.page_url:
+            raise ValueError("Navigation events require page_url")
+        if not self.page_url and not self.application:
+            raise ValueError("Desktop events require application when page_url is absent")
+        return self
 
 
 class SessionStatus(StrEnum):
@@ -44,6 +79,8 @@ class SessionStatus(StrEnum):
 class WorkflowSessionCreate(StrictModel):
     schema_version: Literal["1.0"] = SCHEMA_VERSION
     tenant_id: UUID
+    source_type: CaptureSource = CaptureSource.BROWSER
+    recording_id: UUID | None = None
     workflow_name: str = Field(min_length=1, max_length=200)
     typed_text_consent: bool = False
     consent_actor: str | None = Field(default=None, max_length=200)
@@ -182,6 +219,7 @@ class ChunkContentType(StrEnum):
 
 class RecordingCreate(StrictModel):
     workflow_name: str = Field(min_length=1, max_length=200)
+    source_type: CaptureSource = CaptureSource.DESKTOP
     has_audio: bool = False
 
 
@@ -190,6 +228,8 @@ class Recording(StrictModel):
     tenant_id: UUID
     id: UUID
     workflow_name: str
+    source_type: CaptureSource
+    session_id: UUID | None = None
     status: RecordingStatus
     expected_chunk_count: int | None = Field(default=None, ge=0)
     uploaded_chunk_count: int = Field(ge=0)
@@ -215,3 +255,21 @@ class RecordingComplete(StrictModel):
 class RecordingStatusResponse(StrictModel):
     recording: Recording
     stages: list[RecordingStatus]
+
+
+class Screenshot(StrictModel):
+    schema_version: Literal["1.0"] = SCHEMA_VERSION
+    tenant_id: UUID
+    id: UUID
+    recording_id: UUID
+    session_id: UUID | None = None
+    sequence: int = Field(ge=1)
+    captured_at: datetime
+    storage_key: str = Field(min_length=1, max_length=500)
+    media_type: str = Field(default="image/png", max_length=100)
+    width: int = Field(gt=0)
+    height: int = Field(gt=0)
+    change_score: float = Field(ge=0, le=1)
+    content_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
+    redaction_status: Literal["pending", "not_required", "redacted", "failed"] = "pending"
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

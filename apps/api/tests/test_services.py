@@ -62,3 +62,35 @@ def test_sop_generation_preserves_opaque_screenshot_id():
     session.events[0] = session.events[0].model_copy(update={"screenshot_reference": screenshot_id})
     sop = generate_sop(session)
     assert sop.steps[0].screenshot_reference == screenshot_id
+
+
+def test_generates_sop_from_desktop_events_and_after_state():
+    tenant_id = uuid4()
+    screenshot_id = uuid4()
+    session = WorkflowSession(
+        tenant_id=tenant_id,
+        source_type="desktop",
+        workflow_name="Submit invoice",
+        duration_ms=1500,
+        events=[
+            SessionEvent(
+                tenant_id=tenant_id,
+                sequence=1,
+                event_type=EventType.CLICK,
+                application="ERP Desktop",
+                window_title="Invoices",
+                target_role="button",
+                target_label="Submit",
+                x=920,
+                y=640,
+                after_screenshot_id=screenshot_id,
+                duration_ms=1500,
+            )
+        ],
+    )
+
+    sop = generate_sop(session)
+
+    assert sop.steps[0].title == "Select Submit"
+    assert sop.steps[0].instruction == "Click Submit."
+    assert sop.steps[0].screenshot_reference == screenshot_id

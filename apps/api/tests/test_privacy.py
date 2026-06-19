@@ -122,3 +122,22 @@ def test_removes_unconsented_text_from_non_input_events():
     )
     assert result.consented_text is None
     assert result.element_text == "[REDACTED_EMAIL]"
+
+
+def test_sanitizes_desktop_event_without_browser_url():
+    result = sanitize_event(
+        event(
+            event_type=EventType.CLICK,
+            page_url=None,
+            application="ERP Desktop",
+            window_title="Invoice for person@example.com",
+            target_label="Submit invoice",
+            safe_selector=None,
+        ),
+        typed_text_consent=False,
+    )
+
+    assert result.page_url is None
+    assert result.application == "ERP Desktop"
+    assert result.window_title == "Invoice for [REDACTED_EMAIL]"
+    assert result.target_label == "Submit invoice"

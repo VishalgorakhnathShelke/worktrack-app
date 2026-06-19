@@ -22,29 +22,41 @@ def generate_sop(session: WorkflowSession, version: int = 1) -> SOP:
     actionable = [
         event
         for event in session.events
-        if event.event_type in {EventType.CLICK, EventType.INPUT, EventType.NAVIGATION}
+        if event.event_type
+        in {
+            EventType.CLICK,
+            EventType.INPUT,
+            EventType.KEY_BURST,
+            EventType.NAVIGATION,
+            EventType.APP_SWITCH,
+        }
     ]
     for position, event in enumerate(actionable, start=1):
         if event.event_type == EventType.NAVIGATION:
             title = "Open the next page"
             instruction = f"Navigate to {event.page_url.path or '/'}."
-        elif event.event_type == EventType.INPUT:
+        elif event.event_type in {EventType.INPUT, EventType.KEY_BURST}:
             title = "Enter the required information"
-            field_name = event.element_text or "the selected field"
+            field_name = event.target_label or event.element_text or "the selected field"
             instruction = f"Enter the approved value in {field_name}."
+        elif event.event_type == EventType.APP_SWITCH:
+            title = f"Open {event.application or 'the required application'}"
+            instruction = f"Switch to {event.application or 'the required application'}."
         else:
-            title = f"Select {event.element_text or 'the highlighted control'}"
-            target = event.element_text or event.safe_selector or "the selected control"
+            label = event.target_label or event.element_text or "the highlighted control"
+            title = f"Select {label}"
+            target = event.target_label or event.element_text or event.safe_selector
+            target = target or "the selected control"
             instruction = f"Click {target}."
         steps.append(
             SOPStep(
                 position=position,
                 title=title,
                 instruction=instruction,
-                screenshot_reference=event.screenshot_reference,
+                screenshot_reference=event.after_screenshot_id or event.screenshot_reference,
                 estimated_time_ms=event.duration_ms,
                 warning="Confirm the displayed data before continuing."
-                if event.event_type == EventType.INPUT
+                if event.event_type in {EventType.INPUT, EventType.KEY_BURST}
                 else None,
             )
         )
@@ -95,7 +107,7 @@ def analyze_workflow(
     for session in sessions:
         for event in session.events:
             if event.duration_ms is not None:
-                label = event.element_text or event.event_type.value
+                label = event.target_label or event.element_text or event.event_type.value
                 timings[label].append(event.duration_ms)
 
     friction_points = []
@@ -144,9 +156,16 @@ def analyze_workflow(
 
 def _path_signature(session: WorkflowSession) -> tuple[str, ...]:
     return tuple(
-        event.element_text or event.event_type.value
+        event.target_label or event.element_text or event.event_type.value
         for event in session.events
-        if event.event_type in {EventType.CLICK, EventType.INPUT, EventType.NAVIGATION}
+        if event.event_type
+        in {
+            EventType.CLICK,
+            EventType.INPUT,
+            EventType.KEY_BURST,
+            EventType.NAVIGATION,
+            EventType.APP_SWITCH,
+        }
     )
 
 
