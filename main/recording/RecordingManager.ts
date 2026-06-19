@@ -7,6 +7,7 @@ import {
   type RecordingState
 } from '../../shared/recording'
 import { SessionWriter } from './SessionWriter'
+import { ScreenCaptureService } from './ScreenCaptureService'
 
 const idleState: RecordingState = {
   status: 'idle',
@@ -33,7 +34,10 @@ export class RecordingManager extends EventEmitter {
   private state: RecordingState = { ...idleState }
   private options: RecordingOptions = { ...defaultRecordingOptions }
 
-  constructor(private readonly sessionWriter: SessionWriter) {
+  constructor(
+    private readonly sessionWriter: SessionWriter,
+    private readonly screenCapture: ScreenCaptureService
+  ) {
     super()
   }
 
@@ -75,6 +79,26 @@ export class RecordingManager extends EventEmitter {
       throw error
     }
 
+    try {
+      await this.screenCapture.start(this.options, {
+        onScreenshotSaved: () => {
+          this.updateState({ screenshotCount: this.state.screenshotCount + 1 })
+        },
+        onError: (error) => {
+          this.updateState({
+            status: 'error',
+            error: error.message
+          })
+          void this.sessionWriter.setStatus('error')
+        }
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Screen capture could not start.'
+      this.updateState({ status: 'error', error: message })
+      await this.sessionWriter.setStatus('error')
+      throw error
+    }
+
     this.updateState({ status: 'recording' })
     return this.getState()
   }
@@ -85,6 +109,7 @@ export class RecordingManager extends EventEmitter {
       status: 'paused',
       pausedAt: new Date().toISOString()
     })
+    this.screenCapture.pause()
     await this.sessionWriter.setStatus('paused')
     return this.getState()
   }
@@ -101,6 +126,7 @@ export class RecordingManager extends EventEmitter {
       pausedAt: null,
       accumulatedPausedMs: this.state.accumulatedPausedMs + pausedDuration
     })
+    this.screenCapture.resume()
     await this.sessionWriter.setStatus('recording')
     return this.getState()
   }
@@ -121,6 +147,7 @@ export class RecordingManager extends EventEmitter {
       accumulatedPausedMs
     })
 
+    await this.screenCapture.stop()
     this.updateState({ status: 'processing' })
     await this.sessionWriter.setStatus('completed')
     this.updateState({ status: 'completed' })
