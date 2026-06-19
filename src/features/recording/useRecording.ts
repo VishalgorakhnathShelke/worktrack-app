@@ -1,51 +1,61 @@
-import { useCallback, useState } from 'react'
-import type {
-  RecordingController,
-  RecordingSession,
-  RecordingStatus
-} from './recording.types'
+import { useCallback, useEffect, useState } from 'react'
+import type { RecordingState } from '../../../shared/recording'
 
-export function useRecording(controller: RecordingController) {
-  const [status, setStatus] = useState<RecordingStatus>('idle')
-  const [session, setSession] = useState<RecordingSession | null>(null)
-  const [error, setError] = useState<string | null>(null)
+const initialState: RecordingState = {
+  status: 'idle',
+  sessionId: null,
+  sessionName: null,
+  startedAt: null,
+  pausedAt: null,
+  accumulatedPausedMs: 0,
+  eventCount: 0,
+  screenshotCount: 0,
+  outputPath: null,
+  error: null
+}
 
-  const toggleRecording = useCallback(async () => {
-    if (status !== 'idle' && status !== 'recording') {
-      return
-    }
+export function useRecording() {
+  const [state, setState] = useState<RecordingState>(initialState)
+  const [commandError, setCommandError] = useState<string | null>(null)
 
-    setError(null)
-
-    try {
-      if (status === 'recording' && session) {
-        setStatus('stopping')
-        await controller.stop(session.id)
-        setSession(null)
-        setStatus('idle')
-        return
-      }
-
-      setStatus('starting')
-      const nextSession = await controller.start()
-      setSession(nextSession)
-      setStatus('recording')
-    } catch {
-      setError('Recording could not be started. Check capture permissions and try again.')
-      setStatus('error')
-    }
-  }, [controller, session, status])
-
-  const resetError = useCallback(() => {
-    setError(null)
-    setStatus('idle')
+  useEffect(() => {
+    void window.api.recording.getState().then(setState)
+    return window.api.recording.onStateChanged(setState)
   }, [])
 
+  const runCommand = useCallback(async (command: () => Promise<RecordingState>) => {
+    setCommandError(null)
+
+    try {
+      setState(await command())
+    } catch (error) {
+      setCommandError(error instanceof Error ? error.message : 'Recording command failed.')
+    }
+  }, [])
+
+  const start = useCallback(
+    () => runCommand(() => window.api.recording.start()),
+    [runCommand]
+  )
+  const pause = useCallback(
+    () => runCommand(() => window.api.recording.pause()),
+    [runCommand]
+  )
+  const resume = useCallback(
+    () => runCommand(() => window.api.recording.resume()),
+    [runCommand]
+  )
+  const stop = useCallback(
+    () => runCommand(() => window.api.recording.stop()),
+    [runCommand]
+  )
+
   return {
-    error,
-    resetError,
-    session,
-    status,
-    toggleRecording
+    state,
+    error: commandError ?? state.error,
+    start,
+    pause,
+    resume,
+    stop
   }
 }

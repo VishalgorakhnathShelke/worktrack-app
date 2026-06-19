@@ -1,15 +1,21 @@
-import { useEffect, useState } from 'react'
-import { demoRecordingController } from '../features/recording/demoRecordingController'
+import { useCallback, useEffect, useState } from 'react'
 import { useRecording } from '../features/recording/useRecording'
 
-function formatElapsed(startedAt: string | undefined) {
+function formatElapsed(
+  startedAt: string | undefined,
+  accumulatedPausedMs: number,
+  pausedAt?: string
+) {
   if (!startedAt) {
     return '00:00'
   }
 
+  const currentPausedMs = pausedAt ? Date.now() - new Date(pausedAt).getTime() : 0
   const elapsedSeconds = Math.max(
     0,
-    Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000)
+    Math.floor(
+      (Date.now() - new Date(startedAt).getTime() - accumulatedPausedMs - currentPausedMs) / 1000
+    )
   )
   const minutes = Math.floor(elapsedSeconds / 60)
   const seconds = elapsedSeconds % 60
@@ -18,11 +24,25 @@ function formatElapsed(startedAt: string | undefined) {
 }
 
 export function RecorderCard() {
-  const { error, resetError, session, status, toggleRecording } =
-    useRecording(demoRecordingController)
+  const { error, start, state, stop } = useRecording()
   const [elapsed, setElapsed] = useState('00:00')
+  const { status } = state
   const isRecording = status === 'recording'
-  const isBusy = status === 'starting' || status === 'stopping'
+  const isPaused = status === 'paused'
+  const isBusy =
+    status === 'requesting-permissions' ||
+    status === 'starting' ||
+    status === 'stopping' ||
+    status === 'processing'
+
+  const toggleRecording = useCallback(() => {
+    if (isRecording || isPaused) {
+      void stop()
+      return
+    }
+
+    void start()
+  }, [isPaused, isRecording, start, stop])
 
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
@@ -37,18 +57,33 @@ export function RecorderCard() {
   }, [toggleRecording])
 
   useEffect(() => {
-    if (!isRecording) {
+    if (!isRecording && !isPaused) {
       setElapsed('00:00')
       return
     }
 
-    setElapsed(formatElapsed(session?.startedAt))
+    const updateElapsed = () =>
+      setElapsed(
+        formatElapsed(
+          state.startedAt ?? undefined,
+          state.accumulatedPausedMs,
+          state.pausedAt ?? undefined
+        )
+      )
+
+    updateElapsed()
     const timer = window.setInterval(() => {
-      setElapsed(formatElapsed(session?.startedAt))
+      updateElapsed()
     }, 1000)
 
     return () => window.clearInterval(timer)
-  }, [isRecording, session?.startedAt])
+  }, [
+    isPaused,
+    isRecording,
+    state.accumulatedPausedMs,
+    state.pausedAt,
+    state.startedAt
+  ])
 
   return (
     <section className="mx-auto mt-16 mb-12 max-w-[840px] overflow-hidden rounded-xl border border-white/15 bg-[#0c0c0c] shadow-[0_20px_70px_rgba(0,0,0,0.65)]">
@@ -58,20 +93,28 @@ export function RecorderCard() {
             'size-3 rounded-full transition-colors',
             isRecording
               ? 'animate-pulse bg-red-500 shadow-[0_0_18px_rgba(239,68,68,0.7)]'
+              : isPaused
+                ? 'bg-amber-400 shadow-[0_0_16px_rgba(251,191,36,0.45)]'
               : 'bg-red-600 shadow-[0_0_16px_rgba(220,38,38,0.45)]'
           ].join(' ')}
         />
 
         <p className="mt-5 font-mono text-xs font-bold uppercase tracking-[0.32em] text-white/70">
-          {isRecording ? 'Neural trace active' : isBusy ? 'Preparing capture' : 'Ready to capture'}
+          {isRecording
+            ? 'Neural trace active'
+            : isPaused
+              ? 'Neural trace paused'
+              : isBusy
+                ? 'Preparing capture'
+                : 'Ready to capture'}
         </p>
 
         <h2 className="mt-8 text-4xl font-black tracking-[-0.045em] sm:text-5xl">
-          {isRecording ? 'Recording Your Workflow' : 'Initiate Neural Trace'}
+          {isRecording || isPaused ? 'Recording Your Workflow' : 'Initiate Neural Trace'}
         </h2>
 
         <p className="mt-8 max-w-xl text-base leading-7 text-white/65">
-          {isRecording
+          {isRecording || isPaused
             ? 'Your desktop activity is being captured. Complete the workflow naturally, then stop when you are finished.'
             : 'Click below to start recording your desktop activity. AI will automatically segment workflows and generate documentation.'}
         </p>
@@ -82,7 +125,7 @@ export function RecorderCard() {
           onClick={() => void toggleRecording()}
           className={[
             'mt-12 flex min-w-72 items-center justify-center gap-4 rounded-full px-10 py-5 text-base font-extrabold transition focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white disabled:cursor-wait disabled:opacity-60',
-            isRecording
+            isRecording || isPaused
               ? 'border border-red-500/50 bg-red-500 text-white hover:bg-red-400'
               : 'bg-white text-black hover:bg-white/85'
           ].join(' ')}
@@ -90,33 +133,25 @@ export function RecorderCard() {
           <span
             className={[
               'size-4',
-              isRecording ? 'rounded-sm bg-white' : 'rounded-full bg-black'
+              isRecording || isPaused ? 'rounded-sm bg-white' : 'rounded-full bg-black'
             ].join(' ')}
           />
           {status === 'starting'
             ? 'Starting...'
             : status === 'stopping'
               ? 'Saving...'
-              : isRecording
+              : isRecording || isPaused
                 ? 'Stop Recording'
                 : 'Start Recording'}
         </button>
 
-        {isRecording && (
+        {(isRecording || isPaused) && (
           <p className="mt-5 font-mono text-sm font-bold tracking-[0.18em] text-red-400">
             {elapsed}
           </p>
         )}
 
-        {error && (
-          <button
-            type="button"
-            onClick={resetError}
-            className="mt-5 text-xs text-red-400 underline underline-offset-4"
-          >
-            {error}
-          </button>
-        )}
+        {error && <p className="mt-5 text-xs text-red-400">{error}</p>}
 
         <div className="mt-12 flex flex-wrap items-center justify-center gap-4 font-mono text-xs font-semibold tracking-[0.08em] text-white/65 sm:text-sm">
           <span>⌘ Cmd + Shift + R</span>
