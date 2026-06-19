@@ -85,7 +85,7 @@ export function AppShell() {
         ? 'CHECKING SYSTEM'
         : connection.state === 'error'
           ? 'SYSTEM OFFLINE'
-          : 'SETUP REQUIRED'
+          : 'SIGNED OUT'
   const connectionColor =
     connection.state === 'connected'
       ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.75)]'
@@ -129,11 +129,15 @@ export function AppShell() {
           <div className="mt-auto hidden border-t border-white/10 p-5 md:block">
             <div className="flex items-center gap-3">
               <div className="grid size-9 place-items-center rounded-full border border-white/20 bg-white/8 text-xs font-bold">
-                AR
+                {connection.account?.email.slice(0, 2).toUpperCase() || 'WT'}
               </div>
-              <div>
-                <p className="font-mono text-xs font-bold tracking-wide">Alex Rivera</p>
-                <p className="mt-0.5 text-[10px] text-white/45">Admin privileges</p>
+              <div className="min-w-0">
+                <p className="truncate font-mono text-xs font-bold tracking-wide">
+                  {connection.account?.email || 'WorkTrace user'}
+                </p>
+                <p className="mt-0.5 truncate text-[10px] capitalize text-white/45">
+                  {connection.account?.role || 'member'} · {connection.account?.companyName}
+                </p>
               </div>
             </div>
           </div>
