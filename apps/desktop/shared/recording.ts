@@ -113,6 +113,11 @@ export interface RecordingSessionManifest {
   eventCount: number
   screenshotCount: number
   audioChunkCount: number
+  remoteRecordingId: string | null
+  remoteSessionId: string | null
+  remoteStatus: string | null
+  uploadedAt: string | null
+  uploadError: string | null
 }
 
 export interface RecordedEvent {

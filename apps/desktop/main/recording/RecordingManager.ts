@@ -230,6 +230,7 @@ export class RecordingManager extends EventEmitter {
 
     try {
       const remoteRecording = await this.recordingUploader.uploadCompletedSession(sessionPath)
+      await this.sessionWriter.setRemoteRecording(remoteRecording)
       this.updateState({
         status: 'processing',
         remoteRecordingId: remoteRecording.recordingId,
@@ -237,6 +238,7 @@ export class RecordingManager extends EventEmitter {
       })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Recording upload failed.'
+      await this.sessionWriter.setUploadError(message)
       this.updateState({
         status: 'error',
         error: `Recording is saved locally, but upload failed: ${message}`

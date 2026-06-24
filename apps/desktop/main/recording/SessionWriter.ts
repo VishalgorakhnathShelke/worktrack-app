@@ -50,7 +50,12 @@ export class SessionWriter {
         options,
         eventCount: 0,
         screenshotCount: 0,
-        audioChunkCount: 0
+        audioChunkCount: 0,
+        remoteRecordingId: null,
+        remoteSessionId: null,
+        remoteStatus: null,
+        uploadedAt: null,
+        uploadError: null
       }
 
       await this.writeManifest()
@@ -99,6 +104,30 @@ export class SessionWriter {
       await writeFile(join(sessionPath, 'audio', record.filename), payload)
       await appendFile(join(sessionPath, 'audio.jsonl'), `${JSON.stringify(record)}\n`)
       manifest.audioChunkCount += 1
+      await this.writeManifest()
+    })
+  }
+
+  async setRemoteRecording(upload: {
+    recordingId: string
+    sessionId: string | null
+    status: string
+  }): Promise<void> {
+    return this.enqueue(async () => {
+      const { manifest } = this.requireSession()
+      manifest.remoteRecordingId = upload.recordingId
+      manifest.remoteSessionId = upload.sessionId
+      manifest.remoteStatus = upload.status
+      manifest.uploadedAt = new Date().toISOString()
+      manifest.uploadError = null
+      await this.writeManifest()
+    })
+  }
+
+  async setUploadError(message: string): Promise<void> {
+    return this.enqueue(async () => {
+      const { manifest } = this.requireSession()
+      manifest.uploadError = message
       await this.writeManifest()
     })
   }
