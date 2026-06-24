@@ -26,6 +26,7 @@ function formatElapsed(
 export function RecorderCard() {
   const { error, start, state, stop } = useRecording()
   const [elapsed, setElapsed] = useState('00:00')
+  const [audioEnabled, setAudioEnabled] = useState(true)
   const { status } = state
   const isRecording = status === 'recording'
   const isPaused = status === 'paused'
@@ -48,8 +49,8 @@ export function RecorderCard() {
       return
     }
 
-    void start()
-  }, [isPaused, isRecording, start, stop])
+    void start({ recordAudio: audioEnabled })
+  }, [audioEnabled, isPaused, isRecording, start, stop])
 
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
@@ -122,9 +123,33 @@ export function RecorderCard() {
 
         <p className="mt-8 max-w-xl text-base leading-7 text-white/65">
           {isRecording || isPaused
-            ? 'Your desktop activity and microphone narration are being captured. Complete the workflow naturally, then stop when you are finished.'
-            : 'Click below to start recording your desktop activity and narration. AI will automatically segment workflows and generate documentation.'}
+            ? audioEnabled
+              ? 'Your desktop activity and microphone narration are being captured. Complete the workflow naturally, then stop when you are finished.'
+              : 'Your desktop activity is being captured without microphone narration. Complete the workflow naturally, then stop when you are finished.'
+            : 'Click below to start recording your desktop activity. Audio narration can be enabled or disabled before capture starts.'}
         </p>
+
+        <button
+          type="button"
+          disabled={isRecording || isPaused || isBusy}
+          onClick={() => setAudioEnabled((enabled) => !enabled)}
+          className="mt-8 flex items-center gap-3 rounded-full border border-white/15 bg-white/[0.04] px-4 py-2 text-xs font-bold text-white/70 transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-65"
+        >
+          <span
+            className={[
+              'h-5 w-9 rounded-full border p-0.5 transition',
+              audioEnabled ? 'border-emerald-400 bg-emerald-400/20' : 'border-white/20 bg-white/5'
+            ].join(' ')}
+          >
+            <span
+              className={[
+                'block size-3.5 rounded-full transition',
+                audioEnabled ? 'translate-x-4 bg-emerald-300' : 'bg-white/45'
+              ].join(' ')}
+            />
+          </span>
+          {audioEnabled ? 'Mic audio enabled' : 'Mic audio disabled'}
+        </button>
 
         <button
           type="button"
@@ -195,7 +220,7 @@ export function RecorderCard() {
             Full Desktop Mode
           </span>
           <span className="hidden h-5 w-px bg-white/15 sm:block" />
-          <span>Mic Audio</span>
+          <span>{audioEnabled ? 'Mic Audio On' : 'Mic Audio Off'}</span>
         </div>
       </div>
     </section>
