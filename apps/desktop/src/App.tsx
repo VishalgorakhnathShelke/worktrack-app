@@ -6,6 +6,7 @@ import { AuthPage } from './pages/AuthPage'
 import { AudioRecorderPage } from './pages/AudioRecorderPage'
 import { PlaceholderPage } from './pages/PlaceholderPage'
 import { RecordingControlsPage } from './pages/RecordingControlsPage'
+import { SessionsPage } from './pages/SessionsPage'
 import { SettingsPage } from './pages/SettingsPage'
 
 export default function App() {
@@ -39,16 +40,7 @@ export default function App() {
         <Route element={<AppShell />}>
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<DashboardPage />} />
-          <Route
-            path="/sessions"
-            element={
-              <PlaceholderPage
-                eyebrow="Recordings"
-                title="Sessions"
-                description="Review captured workflows and their event timelines."
-              />
-            }
-          />
+          <Route path="/sessions" element={<SessionsPage />} />
           <Route
             path="/sop-library"
             element={
