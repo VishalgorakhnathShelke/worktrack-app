@@ -246,12 +246,24 @@ def test_audio_recording_keeps_transcript_placeholder(client):
     current = client.get(f"/recordings/{recording['id']}/status", headers=auth_headers())
     assert "transcribing_audio" in current.json()["stages"]
     session = client.get(f"/sessions/{completed.json()['session_id']}", headers=auth_headers())
-    assert session.json()["transcript"] == {
+    transcript = session.json()["transcript"]
+    assert transcript == {
         "status": "pending_transcription",
         "text": None,
         "segments": [],
         "audio_chunk_count": 1,
+        "audio_reference": f"{TEST_TENANT_ID}/{recording['id']}/assembled/audio.webm",
     }
+    assembled_audio = (
+        Path(__file__).parent
+        / "data"
+        / "recordings"
+        / TEST_TENANT_ID
+        / recording["id"]
+        / "assembled"
+        / "audio.webm"
+    )
+    assert assembled_audio.read_bytes() == b"audio-bytes"
 
 
 def test_rejects_checksum_mismatch_and_missing_chunks(client):

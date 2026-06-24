@@ -2303,6 +2303,18 @@
             "minimum": 0.0,
             "title": "Audio Chunk Count",
             "default": 0
+          },
+          "audio_reference": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Reference"
           }
         },
         "additionalProperties": false,

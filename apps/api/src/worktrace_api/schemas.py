@@ -146,6 +146,7 @@ class RecordingTranscript(StrictModel):
     text: str | None = Field(default=None, max_length=20_000)
     segments: list[TranscriptSegment] = Field(default_factory=list, max_length=5000)
     audio_chunk_count: int = Field(default=0, ge=0)
+    audio_reference: str | None = Field(default=None, max_length=500)
 
 
 class WorkflowSessionCreate(StrictModel):

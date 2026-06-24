@@ -5,7 +5,7 @@ from typing import Any
 from uuid import UUID, uuid5
 
 from worktrace_api.privacy import sanitize_session
-from worktrace_api.recordings import ChunkStorage
+from worktrace_api.recordings import ChunkStorage, chunk_extension
 from worktrace_api.repository import Repository
 from worktrace_api.schemas import (
     CaptureSource,
@@ -93,14 +93,29 @@ class RecordingProcessor:
             raise
 
     def _transcript(self, chunks: list) -> RecordingTranscript:
-        audio_chunk_count = sum(
-            1 for chunk in chunks if chunk.content_type == ChunkContentType.AUDIO
-        )
+        audio_chunks = [
+            chunk for chunk in chunks if chunk.content_type == ChunkContentType.AUDIO
+        ]
+        audio_chunk_count = len(audio_chunks)
         if audio_chunk_count == 0:
             return RecordingTranscript(status="not_recorded", audio_chunk_count=0)
+
+        media_types = {chunk.media_type for chunk in audio_chunks}
+        if len(media_types) > 1:
+            raise ValueError("Audio chunks must use one media type")
+
+        media_type = next(iter(media_types))
+        extension = chunk_extension(ChunkContentType.AUDIO, media_type)
+        audio_reference, _, _ = self.storage.assemble(
+            UUID(audio_chunks[0].tenant_id),
+            UUID(audio_chunks[0].recording_id),
+            audio_chunks,
+            f"audio{extension}",
+        )
         return RecordingTranscript(
             status="pending_transcription",
             audio_chunk_count=audio_chunk_count,
+            audio_reference=audio_reference,
             segments=[],
         )
 

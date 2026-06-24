@@ -1,8 +1,13 @@
 import hashlib
+from collections.abc import Iterable
 from pathlib import Path
 from uuid import UUID
 
 from worktrace_api.schemas import ChunkContentType
+
+
+class StoredChunk:
+    storage_key: str
 
 
 class ChunkStorage:
@@ -57,6 +62,30 @@ class ChunkStorage:
         if root not in path.parents:
             raise ValueError("Chunk storage key escapes the recording root")
         return path.read_bytes()
+
+    def assemble(
+        self,
+        tenant_id: UUID,
+        recording_id: UUID,
+        chunks: Iterable[StoredChunk],
+        filename: str,
+    ) -> tuple[str, int, str]:
+        directory = self.root / str(tenant_id) / str(recording_id) / "assembled"
+        directory.mkdir(parents=True, exist_ok=True)
+        destination = directory / filename
+        temporary = destination.with_suffix(".tmp")
+        digest = hashlib.sha256()
+        payload_size = 0
+
+        with temporary.open("wb") as output:
+            for chunk in chunks:
+                payload = self.read(chunk.storage_key)
+                output.write(payload)
+                digest.update(payload)
+                payload_size += len(payload)
+
+        temporary.replace(destination)
+        return str(destination.relative_to(self.root)), payload_size, digest.hexdigest()
 
 
 def chunk_extension(content_type: ChunkContentType, media_type: str) -> str:
