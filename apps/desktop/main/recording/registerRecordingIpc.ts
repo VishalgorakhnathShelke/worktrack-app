@@ -25,6 +25,8 @@ export function registerRecordingIpc(
   ipcMain.handle(recordingIpc.pause, () => manager.pause())
   ipcMain.handle(recordingIpc.resume, () => manager.resume())
   ipcMain.handle(recordingIpc.stop, () => manager.stop())
+  ipcMain.handle(recordingIpc.save, (_event, name: string) => manager.save(name))
+  ipcMain.handle(recordingIpc.discard, () => manager.discard())
   ipcMain.handle(recordingIpc.getState, () => manager.getState())
   ipcMain.handle(recordingIpc.listSessions, () => library.listSessions())
   ipcMain.handle(
@@ -52,6 +54,8 @@ export function registerRecordingIpc(
     ipcMain.removeHandler(recordingIpc.pause)
     ipcMain.removeHandler(recordingIpc.resume)
     ipcMain.removeHandler(recordingIpc.stop)
+    ipcMain.removeHandler(recordingIpc.save)
+    ipcMain.removeHandler(recordingIpc.discard)
     ipcMain.removeHandler(recordingIpc.getState)
     ipcMain.removeHandler(recordingIpc.listSessions)
     ipcMain.removeHandler(recordingIpc.openPermissionSettings)

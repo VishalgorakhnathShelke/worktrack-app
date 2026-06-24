@@ -221,12 +221,28 @@ export class RecordingManager extends EventEmitter {
     await this.inputEvents.stop()
     await this.screenCapture.stop()
     await this.audioCapture.stop()
-    this.updateState({ status: 'uploading' })
     await this.sessionWriter.setStatus('completed')
+    this.updateState({ status: 'awaiting-save' })
+    return this.getState()
+  }
+
+  async save(name: string): Promise<RecordingState> {
+    this.assertStatus('awaiting-save', 'save')
+    const trimmedName = name.trim()
+    if (trimmedName.length === 0) {
+      throw new Error('Recording name is required.')
+    }
+
     const sessionPath = this.state.outputPath
     if (!sessionPath) {
       throw new Error('Recording was saved without an output path.')
     }
+
+    await this.sessionWriter.setName(trimmedName)
+    this.updateState({
+      status: 'uploading',
+      sessionName: trimmedName
+    })
 
     try {
       const remoteRecording = await this.recordingUploader.uploadCompletedSession(sessionPath)
@@ -247,6 +263,17 @@ export class RecordingManager extends EventEmitter {
     }
 
     this.updateState({ status: 'completed' })
+    return this.getState()
+  }
+
+  async discard(): Promise<RecordingState> {
+    if (this.state.status !== 'awaiting-save' && this.state.status !== 'error') {
+      throw new Error(`Cannot discard a recording while status is ${this.state.status}`)
+    }
+
+    await this.sessionWriter.discardSession()
+    this.options = { ...defaultRecordingOptions }
+    this.updateState({ ...idleState })
     return this.getState()
   }
 

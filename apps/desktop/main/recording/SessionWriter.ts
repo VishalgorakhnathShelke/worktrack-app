@@ -1,4 +1,4 @@
-import { appendFile, mkdir, rename, writeFile } from 'node:fs/promises'
+import { appendFile, mkdir, rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type {
   AudioChunkRecord,
@@ -124,11 +124,30 @@ export class SessionWriter {
     })
   }
 
+  async setName(name: string): Promise<void> {
+    return this.enqueue(async () => {
+      const { manifest } = this.requireSession()
+      manifest.name = name
+      await this.writeManifest()
+    })
+  }
+
   async setUploadError(message: string): Promise<void> {
     return this.enqueue(async () => {
       const { manifest } = this.requireSession()
       manifest.uploadError = message
       await this.writeManifest()
+    })
+  }
+
+  async discardSession(): Promise<void> {
+    return this.enqueue(async () => {
+      const sessionPath = this.sessionPath
+      this.manifest = null
+      this.sessionPath = null
+      if (sessionPath) {
+        await rm(sessionPath, { force: true, recursive: true })
+      }
     })
   }
 

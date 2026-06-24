@@ -40,6 +40,8 @@ contextBridge.exposeInMainWorld('api', {
     pause: () => ipcRenderer.invoke(recordingIpc.pause),
     resume: () => ipcRenderer.invoke(recordingIpc.resume),
     stop: () => ipcRenderer.invoke(recordingIpc.stop),
+    save: (name: string) => ipcRenderer.invoke(recordingIpc.save, name),
+    discard: () => ipcRenderer.invoke(recordingIpc.discard),
     getState: () => ipcRenderer.invoke(recordingIpc.getState),
     listSessions: () =>
       ipcRenderer.invoke(recordingIpc.listSessions) as Promise<RecordedSessionSummary[]>,

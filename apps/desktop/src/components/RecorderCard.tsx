@@ -24,12 +24,14 @@ function formatElapsed(
 }
 
 export function RecorderCard() {
-  const { error, start, state, stop } = useRecording()
+  const { discard, error, save, start, state, stop } = useRecording()
   const [elapsed, setElapsed] = useState('00:00')
   const [audioEnabled, setAudioEnabled] = useState(true)
+  const [saveName, setSaveName] = useState('Untitled workflow')
   const { status } = state
   const isRecording = status === 'recording'
   const isPaused = status === 'paused'
+  const isAwaitingSave = status === 'awaiting-save'
   const isBusy =
     status === 'requesting-permissions' ||
     status === 'starting' ||
@@ -44,13 +46,20 @@ export function RecorderCard() {
     : 'accessibility'
 
   const toggleRecording = useCallback(() => {
+    if (isAwaitingSave) {
+      return
+    }
     if (isRecording || isPaused) {
       void stop()
       return
     }
 
     void start({ recordAudio: audioEnabled })
-  }, [audioEnabled, isPaused, isRecording, start, stop])
+  }, [audioEnabled, isAwaitingSave, isPaused, isRecording, start, stop])
+
+  const saveRecording = useCallback(() => {
+    void save(saveName)
+  }, [save, saveName])
 
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
@@ -93,6 +102,12 @@ export function RecorderCard() {
     state.startedAt
   ])
 
+  useEffect(() => {
+    if (isAwaitingSave) {
+      setSaveName(state.sessionName?.trim() || 'Untitled workflow')
+    }
+  }, [isAwaitingSave, state.sessionName])
+
   return (
     <section className="mx-auto mt-16 mb-12 max-w-[840px] overflow-hidden rounded-xl border border-white/15 bg-[#0c0c0c] shadow-[0_20px_70px_rgba(0,0,0,0.65)]">
       <div className="flex min-h-[520px] flex-col items-center justify-center px-6 py-14 text-center sm:px-12">
@@ -112,13 +127,19 @@ export function RecorderCard() {
             ? 'Neural trace active'
             : isPaused
               ? 'Neural trace paused'
+              : isAwaitingSave
+                ? 'Ready to save'
               : isBusy
                 ? 'Preparing capture'
                 : 'Ready to capture'}
         </p>
 
         <h2 className="mt-8 text-4xl font-black tracking-[-0.045em] sm:text-5xl">
-          {isRecording || isPaused ? 'Recording Your Workflow' : 'Initiate Neural Trace'}
+          {isAwaitingSave
+            ? 'Name This Workflow'
+            : isRecording || isPaused
+              ? 'Recording Your Workflow'
+              : 'Initiate Neural Trace'}
         </h2>
 
         <p className="mt-8 max-w-xl text-base leading-7 text-white/65">
@@ -126,6 +147,8 @@ export function RecorderCard() {
             ? audioEnabled
               ? 'Your desktop activity and microphone narration are being captured. Complete the workflow naturally, then stop when you are finished.'
               : 'Your desktop activity is being captured without microphone narration. Complete the workflow naturally, then stop when you are finished.'
+            : isAwaitingSave
+              ? 'Capture is stopped. Give this workflow a useful name, then save it for backend processing or discard the local evidence.'
             : 'Click below to start recording your desktop activity. Audio narration can be enabled or disabled before capture starts.'}
         </p>
 
@@ -153,7 +176,7 @@ export function RecorderCard() {
 
         <button
           type="button"
-          disabled={isBusy}
+          disabled={isBusy || isAwaitingSave}
           onClick={() => void toggleRecording()}
           className={[
             'mt-12 flex min-w-72 items-center justify-center gap-4 rounded-full px-10 py-5 text-base font-extrabold transition focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white disabled:cursor-wait disabled:opacity-60',
@@ -176,10 +199,53 @@ export function RecorderCard() {
                 ? 'Uploading...'
                 : status === 'processing'
                   ? 'Processing...'
+                  : isAwaitingSave
+                    ? 'Review Recording'
               : isRecording || isPaused
                 ? 'Stop Recording'
                 : 'Start Recording'}
         </button>
+
+        {isAwaitingSave && (
+          <div className="mt-8 w-full max-w-xl rounded-2xl border border-white/12 bg-white/[0.035] p-5 text-left">
+            <label className="block">
+              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-white/45">
+                Workflow name
+              </span>
+              <input
+                value={saveName}
+                onChange={(event) => setSaveName(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault()
+                    saveRecording()
+                  }
+                }}
+                className="mt-3 w-full rounded-xl border border-white/15 bg-black/40 px-4 py-3 text-base font-bold text-white outline-none transition placeholder:text-white/25 focus:border-white/35"
+                placeholder="e.g. Vendor invoice approval"
+                autoFocus
+              />
+            </label>
+
+            <div className="mt-4 flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => void discard()}
+                className="rounded-full border border-white/15 bg-white/[0.04] px-5 py-3 text-sm font-black text-white/65 transition hover:bg-white/[0.08] hover:text-white"
+              >
+                Cancel & Discard
+              </button>
+              <button
+                type="button"
+                onClick={saveRecording}
+                disabled={!saveName.trim()}
+                className="rounded-full bg-white px-6 py-3 text-sm font-black text-black transition hover:bg-white/85 disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                Save Recording
+              </button>
+            </div>
+          </div>
+        )}
 
         {(isRecording || isPaused) && (
           <p className="mt-5 font-mono text-sm font-bold tracking-[0.18em] text-red-400">

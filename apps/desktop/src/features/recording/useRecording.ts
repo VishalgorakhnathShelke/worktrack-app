@@ -57,6 +57,14 @@ export function useRecording() {
     () => runCommand(() => window.api.recording.stop()),
     [runCommand]
   )
+  const save = useCallback(
+    (name: string) => runCommand(() => window.api.recording.save(name)),
+    [runCommand]
+  )
+  const discard = useCallback(
+    () => runCommand(() => window.api.recording.discard()),
+    [runCommand]
+  )
 
   return {
     state,
@@ -64,6 +72,8 @@ export function useRecording() {
     start,
     pause,
     resume,
-    stop
+    stop,
+    save,
+    discard
   }
 }

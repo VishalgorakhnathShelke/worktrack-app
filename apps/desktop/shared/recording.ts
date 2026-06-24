@@ -5,6 +5,7 @@ export type RecordingStatus =
   | 'recording'
   | 'paused'
   | 'stopping'
+  | 'awaiting-save'
   | 'uploading'
   | 'processing'
   | 'completed'
@@ -212,6 +213,8 @@ export interface RecordingApi {
   pause: () => Promise<RecordingState>
   resume: () => Promise<RecordingState>
   stop: () => Promise<RecordingState>
+  save: (name: string) => Promise<RecordingState>
+  discard: () => Promise<RecordingState>
   getState: () => Promise<RecordingState>
   listSessions: () => Promise<RecordedSessionSummary[]>
   openPermissionSettings: (permission: 'accessibility' | 'screen' | 'microphone') => Promise<void>
@@ -223,6 +226,8 @@ export const recordingIpc = {
   pause: 'recording:pause',
   resume: 'recording:resume',
   stop: 'recording:stop',
+  save: 'recording:save',
+  discard: 'recording:discard',
   getState: 'recording:get-state',
   listSessions: 'recording:list-sessions',
   openPermissionSettings: 'recording:open-permission-settings',
