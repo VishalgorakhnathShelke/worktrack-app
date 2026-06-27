@@ -40,9 +40,9 @@ docker exec -it redis redis-cli ping
 
 **2. Run the Celery Worker**
 Open a new terminal, navigate to the `apps/api` directory, and run:
-```bash
-export PYTHONPATH="src"
-celery -A worktrace_api.core.celery_app worker --loglevel=info -P solo
+```powershell
+$env:PYTHONPATH="src"
+celery -A worktrace_api.core.celery_app worker --loglevel=info -P solo -Q default,audio,vision,llm,celery
 ```
 
 Swagger UI is available at `http://localhost:8000/docs`. The checked-in
