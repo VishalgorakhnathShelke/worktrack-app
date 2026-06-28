@@ -279,6 +279,29 @@ class Repository:
             ).all()
         )
 
+    def delete_audio_chunks(self, recording_id: UUID) -> list[str]:
+        # Drops ONLY audio chunks for a recording (rows first, then the caller
+        # deletes the files using the returned storage_keys). Screenshots/events
+        # chunks are left intact. Idempotent: a second call returns [].
+        audio_chunks = self.db.scalars(
+            tenant_query(RecordingChunkRecord, self.tenant_id)
+            .where(
+                RecordingChunkRecord.recording_id == str(recording_id),
+                RecordingChunkRecord.content_type == ChunkContentType.AUDIO.value,
+            )
+        ).all()
+        storage_keys = [chunk.storage_key for chunk in audio_chunks]
+        if storage_keys:
+            self.db.execute(
+                delete(RecordingChunkRecord).where(
+                    RecordingChunkRecord.tenant_id == str(self.tenant_id),
+                    RecordingChunkRecord.recording_id == str(recording_id),
+                    RecordingChunkRecord.content_type == ChunkContentType.AUDIO.value,
+                )
+            )
+            self.db.commit()
+        return storage_keys
+
     def save_screenshots(self, screenshots: list[Screenshot]) -> list[Screenshot]:
         for screenshot in screenshots:
             self._require_tenant(screenshot.tenant_id)
